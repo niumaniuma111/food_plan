@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反馈管理 - 私人食谱与饮食规划师</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🍳 私人食谱与饮食规划师</h1>
+            <nav class="nav">
+                <a href="index.html" class="nav-link">聊天</a>
+                <a href="admin.html" class="nav-link active">反馈管理</a>
+            </nav>
+        </header>
+
+        <!-- Stats Panel -->
+        <section class="stats-panel" id="statsPanel">
+            <div class="stat-item">
+                <span class="stat-label">待审核</span>
+                <span class="stat-value" id="pendingCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">已通过</span>
+                <span class="stat-value" id="approvedCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">已拒绝</span>
+                <span class="stat-value" id="rejectedCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">总计</span>
+                <span class="stat-value" id="totalCount">0</span>
+            </div>
+        </section>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-status="pending">待审核</button>
+            <button class="tab-btn" data-status="approved">已通过</button>
+            <button class="tab-btn" data-status="rejected">已拒绝</button>
+            <button class="tab-btn" data-status="">全部</button>
+        </div>
+
+        <!-- Batch Actions -->
+        <div class="batch-actions">
+            <label>
+                <input type="checkbox" id="selectAll">
+                全选
+            </label>
+            <button class="batch-btn approve-btn" id="batchApprove">批量通过</button>
+            <button class="batch-btn reject-btn" id="batchReject">批量拒绝</button>
+        </div>
+
+        <!-- Feedback List -->
+        <main class="feedback-list" id="feedbackList">
+            <!-- Feedback cards will be dynamically inserted here -->
+        </main>
+    </div>
+
+    <script>
+        // Admin page JavaScript
+        const API_BASE = '/api';
+        let currentStatus = 'pending';
+        let selectedIds = new Set();
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentStatus = btn.dataset.status;
+                loadFeedback();
+            });
+        });
+
+        // Select all checkbox
+        document.getElementById('selectAll').addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('.feedback-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = e.target.checked;
+                if (e.target.checked) {
+                    selectedIds.add(cb.dataset.id);
+                } else {
+                    selectedIds.delete(cb.dataset.id);
+                }
+            });
+        });
+
+        // Batch approve
+        document.getElementById('batchApprove').addEventListener('click', async () => {
+            for (const id of selectedIds) {
+                await fetch(`${API_BASE}/feedback/${id}/approve`, { method: 'PUT' });
+            }
+            selectedIds.clear();
+            loadFeedback();
+            loadStats();
+        });
+
+        // Batch reject
+        document.getElementById('batchReject').addEventListener('click', async () => {
+            for (const id of selectedIds) {
+                await fetch(`${API_BASE}/feedback/${id}/reject`, { method: 'PUT' });
+            }
+            selectedIds.clear();
+            loadFeedback();
+            loadStats();
+        });
+
+        // Load feedback list
+        async function loadFeedback() {
+            const url = currentStatus 
+                ? `${API_BASE}/feedback/list?status=${currentStatus}`
+                : `${API_BASE}/feedback/list`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            const list = document.getElementById('feedbackList');
+            list.innerHTML = '';
+            
+            data.records.forEach(record => {
+                const card = createFeedbackCard(record);
+                list.appendChild(card);
+            });
+        }
+
+        // Load stats
+        async function loadStats() {
+            const response = await fetch(`${API_BASE}/feedback/stats`);
+            const stats = await response.json();
+            
+            document.getElementById('pendingCount').textContent = stats.pending;
+            document.getElementById('approvedCount').textContent = stats.approved;
+            document.getElementById('rejectedCount').textContent = stats.rejected;
+            document.getElementById('totalCount').textContent = stats.total;
+        }
+
+        // Create feedback card
+        function createFeedbackCard(record) {
+            const card = document.createElement('div');
+            card.className = 'feedback-card';
+            card.dataset.id = record.id;
+            
+            const statusClass = `status-${record.status}`;
+            const statusText = {
+                'pending': '待审核',
+                'approved': '已通过',
+                'rejected': '已拒绝',
+                'deleted': '已删除'
+            }[record.status] || record.status;
+            
+            card.innerHTML = `
+                <div class="feedback-header">
+                    <label class="feedback-checkbox-wrapper">
+                        <input type="checkbox" class="feedback-checkbox" data-id="${record.id}">
+                    </label>
+                    <span class="feedback-status ${statusClass}">${statusText}</span>
+                    <span class="feedback-time">${new Date(record.timestamp).toLocaleString()}</span>
+                </div>
+                <div class="feedback-content">
+                    <div class="feedback-question">
+                        <strong>问：</strong>${escapeHtml(record.question)}
+                    </div>
+                    <div class="feedback-answer">
+                        <strong>答：</strong>${escapeHtml(record.answer).substring(0, 200)}${record.answer.length > 200 ? '...' : ''}
+                    </div>
+                </div>
+                ${record.status === 'pending' ? `
+                    <div class="feedback-actions">
+                        <button class="action-btn approve-btn" onclick="approveFeedback('${record.id}')">✓ 通过</button>
+                        <button class="action-btn reject-btn" onclick="rejectFeedback('${record.id}')">✗ 拒绝</button>
+                    </div>
+                ` : ''}
+                ${record.status === 'approved' ? `
+                    <div class="feedback-actions">
+                        <button class="action-btn delete-btn" onclick="deleteFeedback('${record.id}')">🗑 删除</button>
+                    </div>
+                ` : ''}
+            `;
+            
+            // Checkbox change handler
+            const checkbox = card.querySelector('.feedback-checkbox');
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    selectedIds.add(record.id);
+                } else {
+                    selectedIds.delete(record.id);
+                }
+            });
+            
+            return card;
+        }
+
+        // Approve feedback
+        async function approveFeedback(id) {
+            await fetch(`${API_BASE}/feedback/${id}/approve`, { method: 'PUT' });
+            loadFeedback();
+            loadStats();
+        }
+
+        // Reject feedback
+        async function rejectFeedback(id) {
+            await fetch(`${API_BASE}/feedback/${id}/reject`, { method: 'PUT' });
+            loadFeedback();
+            loadStats();
+        }
+
+        // Delete feedback
+        async function deleteFeedback(id) {
+            if (confirm('确定要删除这条反馈吗？')) {
+                await fetch(`${API_BASE}/feedback/${id}`, { method: 'DELETE' });
+                loadFeedback();
+                loadStats();
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initial load
+        loadFeedback();
+        loadStats();
+    </script>
+</body>
+</html>

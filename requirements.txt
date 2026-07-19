@@ -1,0 +1,27 @@
+# LLM & Embedding
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langchain-chroma>=0.2.0
+langchain-text-splitters>=0.3.0
+dashscope>=1.20.0
+
+# Vector Store
+chromadb>=0.5.0
+
+# Retrieval
+rank-bm25>=0.2.2
+jieba>=0.42.1
+
+# Reranker
+sentence-transformers>=3.0.0
+
+# Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# Config
+pydantic-settings>=2.0.0
+pyyaml>=6.0
+python-dotenv>=1.0.0

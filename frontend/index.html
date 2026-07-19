@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>私人食谱与饮食规划师</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🍳 私人食谱与饮食规划师</h1>
+            <nav class="nav">
+                <a href="index.html" class="nav-link active">聊天</a>
+                <a href="admin.html" class="nav-link">反馈管理</a>
+            </nav>
+        </header>
+
+        <!-- Chat Area -->
+        <main class="chat-area" id="chatArea">
+            <!-- Welcome message -->
+            <div class="message ai-message">
+                <div class="message-content">
+                    <p>你好！我是你的私人食谱与饮食规划师。我可以帮你：</p>
+                    <ul>
+                        <li>推荐适合你口味和健康需求的食谱</li>
+                        <li>提供营养搭配建议</li>
+                        <li>解答烹饪技巧问题</li>
+                    </ul>
+                    <p>请问有什么可以帮你的？</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            <div class="input-container">
+                <label class="upload-btn" title="上传食谱文档">
+                    <input type="file" id="fileInput" accept=".md,.txt,.markdown" hidden>
+                    📎
+                </label>
+                <textarea 
+                    id="messageInput" 
+                    placeholder="输入你的问题..." 
+                    rows="1"
+                ></textarea>
+                <button id="sendBtn" class="send-btn">发送</button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
