@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 
 from langchain_core.documents import Document
-from langchain_community.document_loaders import TextLoader, UnstructuredMarkdownLoader
+from langchain_community.document_loaders import TextLoader
 
 
 class DocumentParser:
@@ -34,11 +34,8 @@ class DocumentParser:
         if ext not in DocumentParser.SUPPORTED_EXTENSIONS:
             raise ValueError(f"Unsupported file type: {ext}")
         
-        # Load document based on file type
-        if ext in {".md", ".markdown"}:
-            loader = UnstructuredMarkdownLoader(str(file_path))
-        else:  # .txt
-            loader = TextLoader(str(file_path), encoding="utf-8")
+        # Load document (TextLoader supports both Markdown and TXT)
+        loader = TextLoader(str(file_path), encoding="utf-8")
         
         documents = loader.load()
         
