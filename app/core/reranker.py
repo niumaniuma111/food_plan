@@ -45,8 +45,12 @@ class Reranker:
         if not documents:
             return []
         
+        # Expand query with intent keywords to help cross-encoder understand user intent
+        # e.g. "番茄炒蛋怎么做" -> "番茄炒蛋 做法 食谱 怎么做"
+        expanded_query = self._expand_query(query)
+        
         # Create (query, document) pairs for scoring
-        pairs = [(query, doc.page_content) for doc in documents]
+        pairs = [(expanded_query, doc.page_content) for doc in documents]
         
         # Predict relevance scores
         scores = self.model.predict(pairs)
@@ -63,6 +67,42 @@ class Reranker:
             results.append(doc)
         
         return results
+
+    def _expand_query(self, query: str) -> str:
+        """
+        Expand query with intent keywords to improve reranking accuracy.
+        
+        Adds domain-specific keywords based on common question patterns
+        so the cross-encoder better understands user intent.
+        """
+        intent_keywords = {
+            # 做法类问题
+            "怎么做": "做法 食谱 烹饪方法",
+            "怎样做": "做法 食谱 烹饪方法",
+            "怎么炒": "做法 食谱 烹饪方法",
+            "怎么煮": "做法 食谱 烹饪方法",
+            "怎么蒸": "做法 食谱 烹饪方法",
+            "怎么炖": "做法 食谱 烹饪方法",
+            "怎么烤": "做法 食谱 烹饪方法",
+            "怎么煎": "做法 食谱 烹饪方法",
+            "如何制作": "做法 食谱 烹饪方法",
+            "做法": "食谱 烹饪方法 步骤",
+            # 营养/功效类
+            "营养": "营养价值 功效 健康",
+            "功效": "营养价值 功效 作用",
+            "好处": "营养价值 功效 作用",
+            # 食材类
+            "能不能吃": "适合 禁忌 注意事项",
+            "可以吃吗": "适合 禁忌 注意事项",
+        }
+        
+        expansion = query
+        for pattern, keywords in intent_keywords.items():
+            if pattern in query:
+                expansion = f"{query} {keywords}"
+                break
+        
+        return expansion
 
 
 # Singleton instance
