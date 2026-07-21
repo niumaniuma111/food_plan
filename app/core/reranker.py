@@ -45,19 +45,20 @@ class Reranker:
         if not documents:
             return []
         
-        # Expand query with intent keywords to help cross-encoder understand user intent
-        # e.g. "番茄炒蛋怎么做" -> "番茄炒蛋 做法 食谱 怎么做"
-        expanded_query = self._expand_query(query)
-        
         # Create (query, document) pairs for scoring
-        pairs = [(expanded_query, doc.page_content) for doc in documents]
+        pairs = [(query, doc.page_content) for doc in documents]
         
         # Predict relevance scores
         scores = self.model.predict(pairs)
         
-        # Sort documents by score
+        # Hybrid scoring: combine rerank score with rrf_score from retrieval
+        # α controls the weight of reranker (0.7 = 70% reranker, 30% retrieval)
+        alpha = 0.7
         scored_docs = list(zip(documents, scores))
-        scored_docs.sort(key=lambda x: x[1], reverse=True)
+        scored_docs.sort(
+            key=lambda x: alpha * x[1] + (1 - alpha) * x[0].metadata.get("rrf_score", 0),
+            reverse=True
+        )
         
         # Return top-k documents with updated metadata
         results = []
@@ -67,42 +68,6 @@ class Reranker:
             results.append(doc)
         
         return results
-
-    def _expand_query(self, query: str) -> str:
-        """
-        Expand query with intent keywords to improve reranking accuracy.
-        
-        Adds domain-specific keywords based on common question patterns
-        so the cross-encoder better understands user intent.
-        """
-        intent_keywords = {
-            # 做法类问题
-            "怎么做": "做法 食谱 烹饪方法",
-            "怎样做": "做法 食谱 烹饪方法",
-            "怎么炒": "做法 食谱 烹饪方法",
-            "怎么煮": "做法 食谱 烹饪方法",
-            "怎么蒸": "做法 食谱 烹饪方法",
-            "怎么炖": "做法 食谱 烹饪方法",
-            "怎么烤": "做法 食谱 烹饪方法",
-            "怎么煎": "做法 食谱 烹饪方法",
-            "如何制作": "做法 食谱 烹饪方法",
-            "做法": "食谱 烹饪方法 步骤",
-            # 营养/功效类
-            "营养": "营养价值 功效 健康",
-            "功效": "营养价值 功效 作用",
-            "好处": "营养价值 功效 作用",
-            # 食材类
-            "能不能吃": "适合 禁忌 注意事项",
-            "可以吃吗": "适合 禁忌 注意事项",
-        }
-        
-        expansion = query
-        for pattern, keywords in intent_keywords.items():
-            if pattern in query:
-                expansion = f"{query} {keywords}"
-                break
-        
-        return expansion
 
 
 # Singleton instance
