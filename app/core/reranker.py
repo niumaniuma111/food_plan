@@ -4,6 +4,7 @@ Cross-encoder reranker for document relevance scoring.
 from typing import List
 
 from langchain_core.documents import Document
+from langsmith import traceable
 from sentence_transformers import CrossEncoder
 
 from app.config import get_settings
@@ -25,6 +26,7 @@ class Reranker:
         # Load cross-encoder model (small ~80MB, CPU compatible)
         self.model = CrossEncoder(model_name)
     
+    @traceable(name="Reranker", run_type="retriever")
     def rerank(self, query: str, documents: List[Document], top_k: int = None) -> List[Document]:
         """
         Rerank documents based on relevance to query.

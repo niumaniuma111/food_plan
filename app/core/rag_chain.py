@@ -8,6 +8,7 @@ from typing import AsyncGenerator, List, Tuple
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+from langsmith import traceable, trace
 
 from app.config import get_settings
 from app.core.memory import get_memory
@@ -45,6 +46,11 @@ class RAGChain:
             streaming=True,
         )
     
+    @traceable(name="LLM Generation", run_type="llm")
+    async def _call_llm(self, messages):
+        """Call LLM with tracing."""
+        return self.llm.astream(messages)
+    
     async def astream(
         self,
         query: str,
@@ -60,45 +66,43 @@ class RAGChain:
         Yields:
             Tuple of (token, sources) where sources is only included in first yield
         """
-        # 1. Run blocking retrieval in thread pool to avoid blocking event loop
-        memory_docs = await asyncio.to_thread(
-            self.memory.retrieve, session_id, query, 3
-        )
-        
-        retrieved_docs = await asyncio.to_thread(
-            self.hybrid_retriever.retrieve, query
-        )
-        
-        ranked_docs = await asyncio.to_thread(
-            self.reranker.rerank, query, retrieved_docs
-        )
-        
-        # 2. Build prompt
-        prompt = self.prompt_builder.build(query, ranked_docs, memory_docs)
-        
-        # 3. Format sources for frontend
-        sources = self.prompt_builder.format_sources(ranked_docs)
-        
-        # 4. Stream LLM response
-        messages = [
-            SystemMessage(content=prompt),
-            HumanMessage(content=query),
-        ]
-        
-        full_response = ""
-        first_chunk = True
-        
-        async for chunk in self.llm.astream(messages):
-            token = chunk.content
-            if not token:
-                continue
-            full_response += token
+        with trace(name="RAG Pipeline", run_type="chain", inputs={"query": query, "session_id": session_id}) as parent_run:
+            # 1. Retrieve documents (synchronous, direct call to preserve trace context)
+            memory_docs = self.memory.retrieve(session_id, query, 3)
             
-            if first_chunk:
-                yield token, sources
-                first_chunk = False
-            else:
-                yield token, []
+            retrieved_docs = self.hybrid_retriever.retrieve(query)
+            
+            ranked_docs = self.reranker.rerank(query, retrieved_docs)
+            
+            # 2. Build prompt
+            prompt = self.prompt_builder.build(query, ranked_docs, memory_docs)
+            
+            # 3. Format sources for frontend
+            sources = self.prompt_builder.format_sources(ranked_docs)
+            
+            # 4. Stream LLM response
+            messages = [
+                SystemMessage(content=prompt),
+                HumanMessage(content=query),
+            ]
+            
+            full_response = ""
+            first_chunk = True
+            
+            async for chunk in await self._call_llm(messages):
+                token = chunk.content
+                if not token:
+                    continue
+                full_response += token
+                
+                if first_chunk:
+                    yield token, sources
+                    first_chunk = False
+                else:
+                    yield token, []
+            
+            # Record final output on parent trace
+            parent_run.outputs = {"response": full_response, "sources": sources}
         
         # 5. Store conversation turn in memory (background)
         try:

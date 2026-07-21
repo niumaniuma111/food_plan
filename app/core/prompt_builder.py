@@ -5,6 +5,7 @@ Assembles prompts with memory context and retrieved documents.
 from typing import List
 
 from langchain_core.documents import Document
+from langsmith import traceable
 
 
 class PromptBuilder:
@@ -32,6 +33,7 @@ class PromptBuilder:
 5. 如果参考资料中没有相关信息，请明确说明，并基于你的专业知识给出建议
 """
     
+    @traceable(name="Prompt Builder", run_type="chain")
     def build(
         self,
         query: str,

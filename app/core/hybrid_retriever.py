@@ -5,6 +5,7 @@ from typing import List, Dict
 from collections import defaultdict
 
 from langchain_core.documents import Document
+from langsmith import traceable
 
 from app.config import get_settings
 from app.core.vector_store import get_vectorstore
@@ -35,6 +36,7 @@ class HybridRetriever:
         # Feedback QA weight multiplier
         self.feedback_weight = 1.5
     
+    @traceable(name="Hybrid Retrieval", run_type="retriever")
     def retrieve(self, query: str) -> List[Document]:
         """
         Retrieve documents using hybrid search with RRF fusion.
